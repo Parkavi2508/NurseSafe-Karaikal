@@ -1,0 +1,6 @@
+{
+  "name": "NurseSafe Karaikal — Clinical Safety Lab",
+  "description": "Interactive clinical safety simulation and competency training platform for nursing students and healthcare staff. Features bilingual WHO hand hygiene, PPE workflows, sharps safety, biomedical waste segregation, and real-time clinical evaluations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

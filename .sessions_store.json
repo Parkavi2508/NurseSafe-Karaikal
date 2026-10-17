@@ -1,0 +1,51 @@
+[
+  {
+    "id": "sess-1792244651063-7zrjb",
+    "moduleId": "medication_safety",
+    "moduleTitle": "Safe Medication Administration & 10 Rights",
+    "studentName": "Saravanan M",
+    "age": 22,
+    "uploadedFileName": "ward_assignment.pdf",
+    "uploadedFileSize": "310 KB",
+    "uploadedInfo": "Ward 2 ICU Medication Protocol",
+    "score": 20,
+    "totalQuestions": 20,
+    "percentage": 100,
+    "points": 240,
+    "maxStreak": 20,
+    "timeSpentSeconds": 160,
+    "wrongQuestionsList": "",
+    "passed": true,
+    "timestamp": "2026-10-17T13:44:11.063Z"
+  },
+  {
+    "id": "sess-1792243884414-fernj",
+    "moduleId": "medication_safety",
+    "moduleTitle": "Safe Medication Administration & 10 Rights",
+    "studentName": "Test User Anitha",
+    "score": 20,
+    "totalQuestions": 20,
+    "percentage": 100,
+    "points": 260,
+    "maxStreak": 20,
+    "timeSpentSeconds": 120,
+    "wrongQuestionsList": "",
+    "passed": true,
+    "timestamp": "2026-10-17T13:31:24.414Z"
+  },
+  {
+    "id": "demo-session-1",
+    "moduleId": "hand_hygiene",
+    "moduleTitle": "WHO Hand Hygiene Lab",
+    "studentName": "Staff Nurse Trainee",
+    "score": 19,
+    "totalQuestions": 20,
+    "percentage": 95,
+    "points": 210,
+    "maxStreak": 12,
+    "timeSpentSeconds": 145,
+    "wrongQuestionsList": "hh_8",
+    "passed": true,
+    "timestamp": "2026-10-17T13:31:11.706Z"
+  }
+]
