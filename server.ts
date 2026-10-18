@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import os from 'os';
 import * as XLSX from 'xlsx';
 import { CLINICAL_MODULES, WASTE_ITEMS, PPE_STEPS, PEP_ALGORITHM } from './src/data/clinicalData.js';
 import { SessionResult } from './src/types/clinical.js';
@@ -15,12 +16,21 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Persistent Database Store (JSON backend storage only - no static CSV or XLSX files kept on disk)
-const SESSIONS_JSON_FILE = path.join(__dirname, '.sessions_store.json');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+// Persistent Database Store with Serverless os.tmpdir() fallback
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const SESSIONS_JSON_FILE = isVercel
+  ? path.join(os.tmpdir(), '.sessions_store.json')
+  : path.join(__dirname, '.sessions_store.json');
+const UPLOADS_DIR = isVercel
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.join(__dirname, 'uploads');
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Uploads directory creation skipped/failed safely:', err);
 }
 
 let sessionsStore: SessionResult[] = [];
