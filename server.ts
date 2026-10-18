@@ -466,9 +466,27 @@ async function startServer() {
       }
     });
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    const distPath = path.resolve(__dirname, 'dist');
+    const indexPath = path.resolve(distPath, 'index.html');
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+    }
     app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>NurseSafe Karaikal — Loading</title></head>
+            <body style="font-family:sans-serif; text-align:center; padding:50px;">
+              <h2>NurseSafe Karaikal Clinical Safety Lab</h2>
+              <p>Application is building or static bundle is generating. Please refresh in a moment.</p>
+              <p><a href="/api/health">Check API Health</a></p>
+            </body>
+          </html>
+        `);
+      }
     });
   }
 
