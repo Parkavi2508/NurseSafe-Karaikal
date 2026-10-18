@@ -467,25 +467,22 @@ async function startServer() {
     });
   } else {
     const distPath = path.resolve(__dirname, 'dist');
-    const indexPath = path.resolve(distPath, 'index.html');
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
+    const rootDistPath = path.resolve(process.cwd(), 'dist');
+    const actualDist = fs.existsSync(distPath) ? distPath : (fs.existsSync(rootDistPath) ? rootDistPath : distPath);
+
+    if (fs.existsSync(actualDist)) {
+      app.use(express.static(actualDist));
     }
-    app.get('*', (_req: Request, res: Response) => {
+
+    app.get('*', (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      const indexPath = path.resolve(actualDist, 'index.html');
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
-        res.status(200).send(`
-          <!DOCTYPE html>
-          <html>
-            <head><title>NurseSafe Karaikal — Loading</title></head>
-            <body style="font-family:sans-serif; text-align:center; padding:50px;">
-              <h2>NurseSafe Karaikal Clinical Safety Lab</h2>
-              <p>Application is building or static bundle is generating. Please refresh in a moment.</p>
-              <p><a href="/api/health">Check API Health</a></p>
-            </body>
-          </html>
-        `);
+        res.status(404).send('Frontend static bundle (dist/index.html) not found. Please ensure build completed successfully.');
       }
     });
   }
