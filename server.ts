@@ -3,8 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import * as XLSX from 'xlsx';
-import { CLINICAL_MODULES, WASTE_ITEMS, PPE_STEPS, PEP_ALGORITHM } from './src/data/clinicalData.ts';
-import { SessionResult } from './src/types/clinical.ts';
+import { CLINICAL_MODULES, WASTE_ITEMS, PPE_STEPS, PEP_ALGORITHM } from './src/data/clinicalData.js';
+import { SessionResult } from './src/types/clinical.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

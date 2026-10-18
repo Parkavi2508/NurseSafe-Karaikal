@@ -1,4 +1,4 @@
-import { ClinicalQuestion } from '../types/clinical.ts';
+import { ClinicalQuestion } from '../types/clinical.js';
 
 // Shuffles an array randomly using Fisher-Yates algorithm
 export function shuffleArray<T>(array: T[]): T[] {
