@@ -466,16 +466,22 @@ async function startServer() {
       }
     });
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
-    const rootDistPath = path.resolve(process.cwd(), 'dist');
-    const actualDist = fs.existsSync(distPath) ? distPath : (fs.existsSync(rootDistPath) ? rootDistPath : distPath);
+    const candidates = [
+      path.resolve(__dirname, 'dist'),
+      path.resolve(process.cwd(), 'dist'),
+      path.resolve(__dirname, '../dist'),
+      path.resolve(process.cwd(), '../dist'),
+      path.resolve(__dirname, '../../dist'),
+      path.resolve('/var/task/dist'),
+    ];
+    const actualDist = candidates.find(p => fs.existsSync(path.resolve(p, 'index.html'))) || candidates[0];
 
     if (fs.existsSync(actualDist)) {
       app.use(express.static(actualDist));
     }
 
     app.get('*', (req: Request, res: Response, next) => {
-      if (req.path.startsWith('/api')) {
+      if (req.path.startsWith('/api') || req.path === '/dataset') {
         return next();
       }
       const indexPath = path.resolve(actualDist, 'index.html');
@@ -496,3 +502,5 @@ startServer().catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
+
+export default app;
