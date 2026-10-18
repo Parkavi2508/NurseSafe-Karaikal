@@ -2,7 +2,7 @@ import React from 'react';
 import { Language } from '../types/clinical';
 import { ArrowRight, BookOpen, ShieldCheck, HeartPulse } from 'lucide-react';
 import { sound } from '../utils/audio';
-import heroImg from '../assets/images/hero_clinical_lab_simulation_1792165717929.jpg';
+const heroImg = '/images/hero_clinical_lab_simulation_1792165717929.jpg';
 
 interface HeroSectionProps {
   lang: Language;

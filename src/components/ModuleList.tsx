@@ -3,10 +3,10 @@ import { SafetyModule, Language } from '../types/clinical';
 import { Clock, Sparkles, Shield, AlertTriangle, UserCheck, Recycle, Pill, ArrowRight } from 'lucide-react';
 import { sound } from '../utils/audio';
 
-import heroImg from '../assets/images/hero_clinical_lab_simulation_1792165717929.jpg';
-import ppeImg from '../assets/images/clinical_ppe_safety_1792165733681.jpg';
-import sharpsImg from '../assets/images/clinical_sharps_safety_1792165752556.jpg';
-import patientIdImg from '../assets/images/clinical_patient_id_1792165766885.jpg';
+const heroImg = '/images/hero_clinical_lab_simulation_1792165717929.jpg';
+const ppeImg = '/images/clinical_ppe_safety_1792165733681.jpg';
+const sharpsImg = '/images/clinical_sharps_safety_1792165752556.jpg';
+const patientIdImg = '/images/clinical_patient_id_1792165766885.jpg';
 
 interface ModuleListProps {
   modules: SafetyModule[];

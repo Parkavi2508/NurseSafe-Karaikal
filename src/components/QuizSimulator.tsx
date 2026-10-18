@@ -160,6 +160,7 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
   const finishQuiz = async () => {
     setIsCompleted(true);
     const percentage = Math.round((correctCount / total) * 100);
+    const passed = percentage >= 80;
 
     if (percentage >= 80) {
       try {
@@ -184,7 +185,7 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
       age: userAge ? parseInt(userAge) : undefined,
       score: correctCount,
       totalQuestions: total,
-      percentage: Math.round((correctCount / total) * 100),
+      percentage,
       points,
       maxStreak,
       timeSpentSeconds: durationSeconds,
