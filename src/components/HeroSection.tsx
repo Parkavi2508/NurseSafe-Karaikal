@@ -2,6 +2,7 @@ import React from 'react';
 import { Language } from '../types/clinical';
 import { ArrowRight, BookOpen, ShieldCheck, HeartPulse } from 'lucide-react';
 import { sound } from '../utils/audio';
+import heroImg from '../assets/images/hero_clinical_lab_simulation_1792165717929.jpg';
 
 interface HeroSectionProps {
   lang: Language;
@@ -21,7 +22,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Background with subtle photo scrim */}
       <div className="absolute inset-0 z-0 opacity-20">
         <img
-          src="/src/assets/images/hero_clinical_lab_simulation_1792165717929.jpg"
+          src={heroImg}
           alt="Clinical Simulation Lab"
           className="w-full h-full object-cover object-center"
           referrerPolicy="no-referrer"

@@ -3,6 +3,11 @@ import { SafetyModule, Language } from '../types/clinical';
 import { Clock, Sparkles, Shield, AlertTriangle, UserCheck, Recycle, Pill, ArrowRight } from 'lucide-react';
 import { sound } from '../utils/audio';
 
+import heroImg from '../assets/images/hero_clinical_lab_simulation_1792165717929.jpg';
+import ppeImg from '../assets/images/clinical_ppe_safety_1792165733681.jpg';
+import sharpsImg from '../assets/images/clinical_sharps_safety_1792165752556.jpg';
+import patientIdImg from '../assets/images/clinical_patient_id_1792165766885.jpg';
+
 interface ModuleListProps {
   modules: SafetyModule[];
   lang: Language;
@@ -40,15 +45,15 @@ export const ModuleList: React.FC<ModuleListProps> = ({
   const getModuleImage = (id: string) => {
     switch (id) {
       case 'ppe_safety':
-        return '/src/assets/images/clinical_ppe_safety_1792165733681.jpg';
+        return ppeImg;
       case 'sharps_safety':
-        return '/src/assets/images/clinical_sharps_safety_1792165752556.jpg';
+        return sharpsImg;
       case 'patient_id':
       case 'medication_safety':
-        return '/src/assets/images/clinical_patient_id_1792165766885.jpg';
+        return patientIdImg;
       case 'hand_hygiene':
       default:
-        return '/src/assets/images/hero_clinical_lab_simulation_1792165717929.jpg';
+        return heroImg;
     }
   };
 

@@ -176,6 +176,23 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
     const durationSeconds = Math.max(5, Math.round((Date.now() - startTime) / 1000));
     setIsSaving(true);
 
+    const localSession: SessionResult = {
+      id: `sess-${Date.now()}`,
+      moduleId: module.id,
+      moduleTitle: module.title[lang],
+      studentName: userName.trim() || 'Learner',
+      age: userAge ? parseInt(userAge) : undefined,
+      score: correctCount,
+      totalQuestions: total,
+      percentage: Math.round((correctCount / total) * 100),
+      points,
+      maxStreak,
+      timeSpentSeconds: durationSeconds,
+      wrongQuestionsList: wrongQuestions.map(w => w.id).join('; '),
+      passed,
+      timestamp: new Date().toISOString()
+    };
+
     try {
       const response = await fetch('/api/sessions', {
         method: 'POST',
@@ -195,11 +212,17 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
 
       if (response.ok) {
         const resData = await response.json();
-        setRecordedSession(resData.data);
-        onSessionCompleted(resData.data);
+        const saved = resData.data || localSession;
+        setRecordedSession(saved);
+        onSessionCompleted(saved);
+      } else {
+        setRecordedSession(localSession);
+        onSessionCompleted(localSession);
       }
     } catch (err) {
-      console.error('Failed to save session:', err);
+      console.warn('Backend unavailable, saving session locally:', err);
+      setRecordedSession(localSession);
+      onSessionCompleted(localSession);
     } finally {
       setIsSaving(false);
     }

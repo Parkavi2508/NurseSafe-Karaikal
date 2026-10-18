@@ -19,6 +19,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { sound } from '../utils/audio';
+import * as XLSX from 'xlsx';
 
 interface DashboardProps {
   sessions: SessionResult[];
@@ -69,6 +70,98 @@ export const Dashboard: React.FC<DashboardProps> = ({
       fetchBackendRecords();
     }
     setShowBackendTable(prev => !prev);
+  };
+
+  const getExportData = () => {
+    const list = backendRecords.length > 0 ? backendRecords : sessions;
+    if (list.length === 0) {
+      return [{
+        'Session ID': 'sample-001',
+        'Date & Time': new Date().toISOString(),
+        'Learner Name': 'Learner Sample',
+        'Age': 20,
+        'Module ID': 'hand_hygiene',
+        'Module Title': 'WHO Hand Hygiene Lab',
+        'Marks Scored': 20,
+        'Total Questions': 20,
+        'Accuracy (%)': '100%',
+        'Points Earned': 200,
+        'Max Streak': 20,
+        'Duration (Seconds)': 120,
+        'Status': 'PASS',
+        'Wrong Questions': 'None'
+      }];
+    }
+    return list.map(s => ({
+      'Session ID': s.id,
+      'Date & Time': s.timestamp,
+      'Learner Name': s.studentName,
+      'Age': s.age !== undefined ? s.age : 'N/A',
+      'Module ID': s.moduleId,
+      'Module Title': s.moduleTitle,
+      'Marks Scored': s.score,
+      'Total Questions': s.totalQuestions,
+      'Accuracy (%)': `${s.percentage}%`,
+      'Points Earned': s.points || s.score * 10,
+      'Max Streak': s.maxStreak || 0,
+      'Duration (Seconds)': s.timeSpentSeconds || 0,
+      'Status': s.passed ? 'PASS' : 'RETRY',
+      'Wrong Questions': s.wrongQuestionsList || 'None'
+    }));
+  };
+
+  const handleDownloadExcel = async () => {
+    sound.playSuccess();
+    try {
+      const res = await fetch('/api/download/excel');
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'live_web_dataset.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+    } catch {
+      // Fallback to client-side XLSX generation
+    }
+    const data = getExportData();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Live Dataset');
+    XLSX.writeFile(wb, 'live_web_dataset.xlsx');
+  };
+
+  const handleDownloadCSV = async () => {
+    sound.playSuccess();
+    try {
+      const res = await fetch('/api/download/csv');
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'live_web_dataset.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+    } catch {
+      // Fallback to client-side CSV generation
+    }
+    const data = getExportData();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'live_web_dataset.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const totalSessions = sessions.length;

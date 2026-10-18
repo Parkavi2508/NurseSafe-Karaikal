@@ -429,6 +429,9 @@ app.delete('/api/sessions', (_req: Request, res: Response) => {
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // Serve static assets fallback
+  app.use('/src/assets', express.static(path.resolve(__dirname, 'src/assets')));
+
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
