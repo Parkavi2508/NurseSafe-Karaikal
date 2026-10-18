@@ -1,5 +1,5 @@
-import { SafetyModule, WasteItem, PPEStep, PEPStep, ClinicalQuestion } from '../types/clinical';
-import { generateQuestionsForModule } from './questionBank';
+import { SafetyModule, WasteItem, PPEStep, PEPStep, ClinicalQuestion } from '../types/clinical.ts';
+import { generateQuestionsForModule } from './questionBank.ts';
 
 // Define the 6 core modules
 export const CLINICAL_MODULES: SafetyModule[] = [
