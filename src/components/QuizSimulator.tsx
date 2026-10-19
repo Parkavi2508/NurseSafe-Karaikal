@@ -198,8 +198,9 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
 
     // Permanently persist to Google Cloud Firestore (immune to serverless scale-to-zero)
     try {
+      const cleanSession = JSON.parse(JSON.stringify(localSession));
       await setDoc(doc(db, 'clinical_sessions', localSession.id), {
-        ...localSession,
+        ...cleanSession,
         createdAt: localSession.timestamp
       });
     } catch (fireErr) {

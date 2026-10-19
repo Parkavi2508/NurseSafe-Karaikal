@@ -6,6 +6,8 @@ import os from 'os';
 import * as XLSX from 'xlsx';
 import { CLINICAL_MODULES, WASTE_ITEMS, PPE_STEPS, PEP_ALGORITHM } from './src/data/clinicalData.js';
 import { SessionResult } from './src/types/clinical.js';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +36,40 @@ try {
 }
 
 let sessionsStore: SessionResult[] = [];
+
+// Initialize Firestore cloud connection for permanent cross-user dataset persistence
+let firestoreDb: any = null;
+try {
+  const configFile = path.resolve(__dirname, 'firebase-applet-config.json');
+  if (fs.existsSync(configFile)) {
+    const configData = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+    const firebaseApp = initializeApp(configData);
+    firestoreDb = getFirestore(firebaseApp, configData.firestoreDatabaseId);
+    console.log('[NurseSafe] Connected to Firestore database for persistent multi-user dataset.');
+  }
+} catch (e) {
+  console.warn('[NurseSafe] Firestore server-side initialization notice:', e);
+}
+
+async function syncSessionsFromFirestore() {
+  if (!firestoreDb) return;
+  try {
+    const snapshot = await getDocs(collection(firestoreDb, 'clinical_sessions'));
+    const firestoreSessions: SessionResult[] = [];
+    snapshot.forEach(docSnap => {
+      firestoreSessions.push(docSnap.data() as SessionResult);
+    });
+    if (firestoreSessions.length > 0) {
+      const map = new Map<string, SessionResult>();
+      sessionsStore.forEach(s => map.set(s.id, s));
+      firestoreSessions.forEach(s => map.set(s.id, s));
+      sessionsStore = Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      persistJSON();
+    }
+  } catch (err) {
+    console.warn('[NurseSafe] Failed to sync sessions from Firestore:', err);
+  }
+}
 
 // Load existing JSON database
 try {
@@ -66,6 +102,9 @@ if (sessionsStore.length === 0) {
   sessionsStore.push(seedSession);
   persistJSON();
 }
+
+// Initial sync from Firestore
+syncSessionsFromFirestore();
 
 function persistJSON() {
   try {
@@ -183,14 +222,15 @@ app.get('/api/tools/pep-algorithm', (_req: Request, res: Response) => {
 });
 
 // Dynamic Sessions API
-app.get('/api/sessions', (_req: Request, res: Response) => {
+app.get('/api/sessions', async (_req: Request, res: Response) => {
+  await syncSessionsFromFirestore();
   res.json({
     success: true,
     data: sessionsStore
   });
 });
 
-app.post('/api/sessions', (req: Request, res: Response) => {
+app.post('/api/sessions', async (req: Request, res: Response) => {
   const body = req.body;
   if (!body.moduleId || body.score === undefined || !body.totalQuestions) {
     res.status(400).json({ success: false, error: 'Invalid session payload' });
@@ -221,6 +261,18 @@ app.post('/api/sessions', (req: Request, res: Response) => {
   sessionsStore.unshift(newSession);
   persistJSON();
 
+  if (firestoreDb) {
+    try {
+      const cleanSession = JSON.parse(JSON.stringify(newSession));
+      await setDoc(doc(firestoreDb, 'clinical_sessions', newSession.id), {
+        ...cleanSession,
+        createdAt: newSession.timestamp
+      });
+    } catch (err) {
+      console.warn('[NurseSafe] Failed to persist session to Firestore:', err);
+    }
+  }
+
   res.status(201).json({
     success: true,
     data: newSession
@@ -228,8 +280,9 @@ app.post('/api/sessions', (req: Request, res: Response) => {
 });
 
 // Download dynamically generated Excel Spreadsheet (.xlsx)
-app.get('/api/download/excel', (_req: Request, res: Response) => {
+app.get('/api/download/excel', async (_req: Request, res: Response) => {
   try {
+    await syncSessionsFromFirestore();
     const buffer = generateExcelBuffer(sessionsStore);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.xlsx"');
@@ -241,8 +294,9 @@ app.get('/api/download/excel', (_req: Request, res: Response) => {
 });
 
 // Download dynamically generated CSV Dataset (.csv)
-app.get('/api/download/csv', (_req: Request, res: Response) => {
+app.get('/api/download/csv', async (_req: Request, res: Response) => {
   try {
+    await syncSessionsFromFirestore();
     const csvContent = generateCSVString(sessionsStore);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.csv"');
@@ -254,8 +308,9 @@ app.get('/api/download/csv', (_req: Request, res: Response) => {
 });
 
 // Download JSON Dataset
-app.get('/api/download/json', (_req: Request, res: Response) => {
+app.get('/api/download/json', async (_req: Request, res: Response) => {
   try {
+    await syncSessionsFromFirestore();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.json"');
     res.send(JSON.stringify(sessionsStore, null, 2));
@@ -265,7 +320,8 @@ app.get('/api/download/json', (_req: Request, res: Response) => {
 });
 
 // Dataset API Info & Metadata
-app.get('/api/dataset', (_req: Request, res: Response) => {
+app.get('/api/dataset', async (_req: Request, res: Response) => {
+  await syncSessionsFromFirestore();
   res.json({
     success: true,
     totalRecords: sessionsStore.length,
@@ -279,7 +335,8 @@ app.get('/api/dataset', (_req: Request, res: Response) => {
 });
 
 // Interactive Live Web Dataset Viewer (/dataset)
-app.get('/dataset', (_req: Request, res: Response) => {
+app.get('/dataset', async (_req: Request, res: Response) => {
+  await syncSessionsFromFirestore();
   const totalRecords = sessionsStore.length;
   const passedCount = sessionsStore.filter(s => s.passed).length;
   const passRate = totalRecords > 0 ? Math.round((passedCount / totalRecords) * 100) : 0;
