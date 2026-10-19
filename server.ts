@@ -344,6 +344,7 @@ app.get('/dataset', (_req: Request, res: Response) => {
       <div>
         <h1 style="margin: 0 0 4px 0; font-size: 22px; letter-spacing: -0.01em;">Live Web Dataset · Clinical Safety Lab</h1>
         <p style="margin: 0; font-size: 13px; opacity: 0.9;">Real-time dataset synchronized dynamically from nurse trainee assessments</p>
+        <span style="display:inline-block; margin-top:6px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.2); padding:3px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.3);">🔒 READ-ONLY RESEARCH AUDIT LOG · MODIFICATIONS RESTRICTED</span>
       </div>
       <div class="actions">
         <a href="/api/download/excel" class="btn btn-green">⬇ Download Excel (.xlsx)</a>
@@ -430,9 +431,10 @@ app.get('/dataset', (_req: Request, res: Response) => {
 });
 
 app.delete('/api/sessions', (_req: Request, res: Response) => {
-  sessionsStore = [];
-  persistJSON();
-  res.json({ success: true, message: 'All session marks cleared' });
+  res.status(403).json({
+    success: false,
+    error: 'Read-only dataset: deletion is strictly disabled to preserve official clinical records.'
+  });
 });
 
 // VITE OR STATIC SERVING

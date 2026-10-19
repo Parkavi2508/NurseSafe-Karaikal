@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import { db } from './firebase';
 import { SafetyModule, SessionResult, Language } from './types/clinical';
 import { CLINICAL_MODULES } from './data/clinicalData';
 import { Header } from './components/Header';
@@ -26,6 +28,29 @@ export default function App() {
   const [certificateSession, setCertificateSession] = useState<SessionResult | null>(null);
   const [lang, setLang] = useState<Language>('en');
   const [audioEnabled, setAudioEnabled] = useState(true);
+
+  // Synchronize permanent assessment records in real-time from Google Cloud Firestore
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'clinical_sessions'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const loaded: SessionResult[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as SessionResult;
+          loaded.push(data);
+        });
+        loaded.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        if (loaded.length > 0) {
+          setSessions(loaded);
+        }
+      }, (err) => {
+        console.warn('Firestore real-time sync notice:', err);
+      });
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn('Firestore initialization notice:', e);
+    }
+  }, []);
 
   // Calculate live cumulative marks and progress across questions answered
   const sessionAnswered = sessions.reduce((acc, s) => acc + s.totalQuestions, 0);
@@ -62,18 +87,6 @@ export default function App() {
     setSessions(prev => [newSession, ...prev]);
   };
 
-  const handleClearSessions = async () => {
-    sound.playClick();
-    setSessions([]);
-    setLiveTotalAnswered(0);
-    setLiveCorrectMarks(0);
-    setLivePoints(0);
-    try {
-      await fetch('/api/sessions', { method: 'DELETE' });
-    } catch (err) {
-      console.error('Failed to clear sessions:', err);
-    }
-  };
 
   const handleToggleAudio = () => {
     const nextState = !audioEnabled;
@@ -175,7 +188,6 @@ export default function App() {
                   sessions={sessions}
                   modules={modules}
                   lang={lang}
-                  onClearSessions={handleClearSessions}
                   onViewCertificate={sess => setCertificateSession(sess)}
                   onRefreshSessions={() => {}}
                   liveTotalAnswered={totalAnswered}

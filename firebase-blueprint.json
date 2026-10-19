@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "ClinicalSession": {
+      "title": "ClinicalSession",
+      "description": "An immutable record of a completed clinical safety simulation assessment.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique session identifier"
+        },
+        "moduleId": {
+          "type": "string",
+          "description": "Identifier of the completed module"
+        },
+        "moduleTitle": {
+          "type": "string",
+          "description": "Title of the module"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Name of the nurse learner",
+          "maxLength": 100
+        },
+        "age": {
+          "type": "number",
+          "description": "Age of the learner"
+        },
+        "score": {
+          "type": "number",
+          "description": "Marks scored"
+        },
+        "totalQuestions": {
+          "type": "number",
+          "description": "Total questions in assessment"
+        },
+        "percentage": {
+          "type": "number",
+          "description": "Score accuracy percentage"
+        },
+        "points": {
+          "type": "number",
+          "description": "Gamification points earned"
+        },
+        "maxStreak": {
+          "type": "number",
+          "description": "Maximum consecutive correct answers"
+        },
+        "timeSpentSeconds": {
+          "type": "number",
+          "description": "Time spent in seconds"
+        },
+        "wrongQuestionsList": {
+          "type": "string",
+          "description": "Semicolon-separated IDs of wrong answers for revision"
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Whether the learner achieved 80% passing threshold"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of completion"
+        }
+      },
+      "required": [
+        "id",
+        "moduleId",
+        "moduleTitle",
+        "studentName",
+        "score",
+        "totalQuestions",
+        "percentage",
+        "passed"
+      ]
+    }
+  },
+  "firestore": {
+    "/clinical_sessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/ClinicalSession"
+      },
+      "description": "Permanent immutable audit log of nurse trainee safety evaluation records."
+    }
+  }
+}

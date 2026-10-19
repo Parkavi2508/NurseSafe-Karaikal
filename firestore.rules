@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['id', 'moduleId', 'moduleTitle', 'studentName', 'score', 'totalQuestions', 'percentage', 'passed'])
+        && data.id is string && data.id.size() <= 128
+        && data.moduleId is string && data.moduleId.size() <= 64
+        && data.moduleTitle is string && data.moduleTitle.size() <= 200
+        && data.studentName is string && data.studentName.size() <= 100
+        && data.score is number && data.score >= 0
+        && data.totalQuestions is number && data.totalQuestions > 0
+        && data.percentage is number && data.percentage >= 0 && data.percentage <= 100
+        && data.passed is bool;
+    }
+
+    match /clinical_sessions/{sessionId} {
+      // Public read access to view clinical records and dataset
+      allow read: if true;
+
+      // Append-only creation of assessment records
+      allow create: if isValidId(sessionId)
+                    && request.resource.data.id == sessionId
+                    && isValidSession(request.resource.data);
+
+      // STRICTLY IMMUTABLE: Editing and deleting are completely forbidden
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

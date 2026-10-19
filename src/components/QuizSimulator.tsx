@@ -4,6 +4,8 @@ import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, FileText, ChevronL
 import { sound } from '../utils/audio';
 import { shuffleArray } from '../data/questionBank';
 import confetti from 'canvas-confetti';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface QuizSimulatorProps {
   module: SafetyModule;
@@ -193,6 +195,16 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
       passed,
       timestamp: new Date().toISOString()
     };
+
+    // Permanently persist to Google Cloud Firestore (immune to serverless scale-to-zero)
+    try {
+      await setDoc(doc(db, 'clinical_sessions', localSession.id), {
+        ...localSession,
+        createdAt: localSession.timestamp
+      });
+    } catch (fireErr) {
+      console.warn('Firestore persistence notice:', fireErr);
+    }
 
     try {
       const response = await fetch('/api/sessions', {
