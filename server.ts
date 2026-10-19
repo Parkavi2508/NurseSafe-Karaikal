@@ -6,8 +6,7 @@ import os from 'os';
 import * as XLSX from 'xlsx';
 import { CLINICAL_MODULES, WASTE_ITEMS, PPE_STEPS, PEP_ALGORITHM } from './src/data/clinicalData.js';
 import { SessionResult } from './src/types/clinical.js';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,99 +17,42 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Persistent Database Store with Serverless os.tmpdir() fallback
-const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-const SESSIONS_JSON_FILE = isVercel
-  ? path.join(os.tmpdir(), '.sessions_store.json')
-  : path.join(__dirname, '.sessions_store.json');
-const UPLOADS_DIR = isVercel
-  ? path.join(os.tmpdir(), 'uploads')
-  : path.join(__dirname, 'uploads');
+// Initialize Supabase Server-Side Client
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
-try {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-} catch (err) {
-  console.warn('Uploads directory creation skipped/failed safely:', err);
+const supabase = (supabaseUrl && supabaseSecretKey)
+  ? createClient(supabaseUrl, supabaseSecretKey, { auth: { persistSession: false } })
+  : null;
+
+if (supabase) {
+  console.log('[NurseSafe] Supabase server-side client initialized successfully.');
+} else {
+  console.warn('[NurseSafe] Supabase credentials (SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) are not fully configured.');
 }
 
 let sessionsStore: SessionResult[] = [];
 
-// Initialize Firestore cloud connection for permanent cross-user dataset persistence
-let firestoreDb: any = null;
-try {
-  const configFile = path.resolve(__dirname, 'firebase-applet-config.json');
-  if (fs.existsSync(configFile)) {
-    const configData = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-    const firebaseApp = initializeApp(configData);
-    firestoreDb = getFirestore(firebaseApp, configData.firestoreDatabaseId);
-    console.log('[NurseSafe] Connected to Firestore database for persistent multi-user dataset.');
-  }
-} catch (e) {
-  console.warn('[NurseSafe] Firestore server-side initialization notice:', e);
-}
-
-async function syncSessionsFromFirestore() {
-  if (!firestoreDb) return;
+async function getLiveSessions(): Promise<SessionResult[]> {
+  if (!supabase) return sessionsStore;
   try {
-    const snapshot = await getDocs(collection(firestoreDb, 'clinical_sessions'));
-    const firestoreSessions: SessionResult[] = [];
-    snapshot.forEach(docSnap => {
-      firestoreSessions.push(docSnap.data() as SessionResult);
-    });
-    if (firestoreSessions.length > 0) {
-      const map = new Map<string, SessionResult>();
-      sessionsStore.forEach(s => map.set(s.id, s));
-      firestoreSessions.forEach(s => map.set(s.id, s));
-      sessionsStore = Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      persistJSON();
+    const { data, error } = await supabase
+      .from('clinical_sessions')
+      .select('session_data, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('[NurseSafe] Supabase fetch error:', error.message);
+      return sessionsStore;
     }
+
+    if (data && data.length > 0) {
+      return data.map((row: any) => row.session_data as SessionResult);
+    }
+    return sessionsStore;
   } catch (err) {
-    console.warn('[NurseSafe] Failed to sync sessions from Firestore:', err);
-  }
-}
-
-// Load existing JSON database
-try {
-  if (fs.existsSync(SESSIONS_JSON_FILE)) {
-    const raw = fs.readFileSync(SESSIONS_JSON_FILE, 'utf-8');
-    sessionsStore = JSON.parse(raw);
-  }
-} catch {
-  sessionsStore = [];
-}
-
-// Seed sample session only if completely empty
-if (sessionsStore.length === 0) {
-  const seedSession: SessionResult = {
-    id: 'sess-init-001',
-    moduleId: 'hand_hygiene',
-    moduleTitle: 'WHO Hand Hygiene Lab',
-    studentName: 'Anitha R',
-    age: 21,
-    score: 19,
-    totalQuestions: 20,
-    percentage: 95,
-    points: 210,
-    maxStreak: 12,
-    timeSpentSeconds: 145,
-    wrongQuestionsList: 'hh_8',
-    passed: true,
-    timestamp: new Date().toISOString()
-  };
-  sessionsStore.push(seedSession);
-  persistJSON();
-}
-
-// Initial sync from Firestore
-syncSessionsFromFirestore();
-
-function persistJSON() {
-  try {
-    fs.writeFileSync(SESSIONS_JSON_FILE, JSON.stringify(sessionsStore, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Failed to write sessions file:', err);
+    console.warn('[NurseSafe] Failed to fetch sessions from Supabase:', err);
+    return sessionsStore;
   }
 }
 
@@ -137,27 +79,15 @@ function generateExcelBuffer(sessions: SessionResult[]): Buffer {
   const ws = XLSX.utils.json_to_sheet(rows);
 
   ws['!cols'] = [
-    { wch: 18 },
-    { wch: 24 },
-    { wch: 20 },
-    { wch: 8 },
-    { wch: 18 },
-    { wch: 32 },
-    { wch: 14 },
-    { wch: 15 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 10 },
-    { wch: 25 }
+    { wch: 18 }, { wch: 24 }, { wch: 20 }, { wch: 8 }, { wch: 18 }, { wch: 32 },
+    { wch: 14 }, { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 18 },
+    { wch: 10 }, { wch: 25 }
   ];
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Live Web Dataset');
+  XLSX.utils.book_append_sheet(wb, ws, 'Supabase Clinical Dataset');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-// Generate CSV string in-memory dynamically on demand
 function generateCSVString(sessions: SessionResult[]): string {
   const header = 'Session_ID,Timestamp_UTC,Learner_Name,Age,Module_ID,Module_Title,Score_Marks,Total_Questions,Accuracy_Percent,Points_Earned,Max_Streak,Time_Spent_Seconds,Result_Status,Wrong_Question_IDs\n';
   const rows = sessions.map(s => [
@@ -186,15 +116,12 @@ app.get('/api/health', (_req: Request, res: Response) => {
     project: 'NurseSafe Karaikal Clinical Safety Project',
     timestamp: new Date().toISOString(),
     activeModulesCount: CLINICAL_MODULES.length,
-    totalSessionsRecorded: sessionsStore.length
+    supabaseConnected: !!supabase
   });
 });
 
 app.get('/api/modules', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    data: CLINICAL_MODULES
-  });
+  res.json({ success: true, data: CLINICAL_MODULES });
 });
 
 app.get('/api/modules/:id', (req: Request, res: Response) => {
@@ -203,10 +130,7 @@ app.get('/api/modules/:id', (req: Request, res: Response) => {
     res.status(404).json({ success: false, error: 'Module not found' });
     return;
   }
-  res.json({
-    success: true,
-    data: mod
-  });
+  res.json({ success: true, data: mod });
 });
 
 app.get('/api/tools/waste-items', (_req: Request, res: Response) => {
@@ -221,13 +145,10 @@ app.get('/api/tools/pep-algorithm', (_req: Request, res: Response) => {
   res.json({ success: true, data: PEP_ALGORITHM });
 });
 
-// Dynamic Sessions API
+// Dynamic Sessions API using Supabase
 app.get('/api/sessions', async (_req: Request, res: Response) => {
-  await syncSessionsFromFirestore();
-  res.json({
-    success: true,
-    data: sessionsStore
-  });
+  const sessions = await getLiveSessions();
+  res.json({ success: true, data: sessions });
 });
 
 app.post('/api/sessions', async (req: Request, res: Response) => {
@@ -258,19 +179,30 @@ app.post('/api/sessions', async (req: Request, res: Response) => {
     timestamp: new Date().toISOString()
   };
 
-  sessionsStore.unshift(newSession);
-  persistJSON();
+  if (!supabase) {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Database persistence error: Supabase credentials (SUPABASE_URL, SUPABASE_SECRET_KEY) are not configured.' 
+    });
+    return;
+  }
 
-  if (firestoreDb) {
-    try {
-      const cleanSession = JSON.parse(JSON.stringify(newSession));
-      await setDoc(doc(firestoreDb, 'clinical_sessions', newSession.id), {
-        ...cleanSession,
-        createdAt: newSession.timestamp
+  try {
+    const { error } = await supabase
+      .from('clinical_sessions')
+      .upsert({
+        id: newSession.id,
+        created_at: newSession.timestamp,
+        session_data: newSession
       });
-    } catch (err) {
-      console.warn('[NurseSafe] Failed to persist session to Firestore:', err);
+
+    if (error) {
+      throw new Error(error.message);
     }
+  } catch (err: any) {
+    console.error('[NurseSafe] Failed to save session to Supabase:', err);
+    res.status(500).json({ success: false, error: 'Failed to persist session to database: ' + (err?.message || err) });
+    return;
   }
 
   res.status(201).json({
@@ -282,10 +214,10 @@ app.post('/api/sessions', async (req: Request, res: Response) => {
 // Download dynamically generated Excel Spreadsheet (.xlsx)
 app.get('/api/download/excel', async (_req: Request, res: Response) => {
   try {
-    await syncSessionsFromFirestore();
-    const buffer = generateExcelBuffer(sessionsStore);
+    const sessions = await getLiveSessions();
+    const buffer = generateExcelBuffer(sessions);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.xlsx"');
+    res.setHeader('Content-Disposition', 'attachment; filename="clinical_sessions_dataset.xlsx"');
     res.send(buffer);
   } catch (err) {
     console.error('Failed to generate Excel download:', err);
@@ -296,10 +228,10 @@ app.get('/api/download/excel', async (_req: Request, res: Response) => {
 // Download dynamically generated CSV Dataset (.csv)
 app.get('/api/download/csv', async (_req: Request, res: Response) => {
   try {
-    await syncSessionsFromFirestore();
-    const csvContent = generateCSVString(sessionsStore);
+    const sessions = await getLiveSessions();
+    const csvContent = generateCSVString(sessions);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.csv"');
+    res.setHeader('Content-Disposition', 'attachment; filename="clinical_sessions_dataset.csv"');
     res.send(csvContent);
   } catch (err) {
     console.error('Failed to generate CSV download:', err);
@@ -310,10 +242,10 @@ app.get('/api/download/csv', async (_req: Request, res: Response) => {
 // Download JSON Dataset
 app.get('/api/download/json', async (_req: Request, res: Response) => {
   try {
-    await syncSessionsFromFirestore();
+    const sessions = await getLiveSessions();
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename="live_web_dataset.json"');
-    res.send(JSON.stringify(sessionsStore, null, 2));
+    res.setHeader('Content-Disposition', 'attachment; filename="clinical_sessions_dataset.json"');
+    res.send(JSON.stringify(sessions, null, 2));
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to generate JSON file' });
   }
@@ -321,30 +253,30 @@ app.get('/api/download/json', async (_req: Request, res: Response) => {
 
 // Dataset API Info & Metadata
 app.get('/api/dataset', async (_req: Request, res: Response) => {
-  await syncSessionsFromFirestore();
+  const sessions = await getLiveSessions();
   res.json({
     success: true,
-    totalRecords: sessionsStore.length,
+    totalRecords: sessions.length,
     downloadUrls: {
       excel: '/api/download/excel',
       csv: '/api/download/csv',
       json: '/api/download/json'
     },
-    records: sessionsStore
+    records: sessions
   });
 });
 
 // Interactive Live Web Dataset Viewer (/dataset)
 app.get('/dataset', async (_req: Request, res: Response) => {
-  await syncSessionsFromFirestore();
-  const totalRecords = sessionsStore.length;
-  const passedCount = sessionsStore.filter(s => s.passed).length;
+  const sessions = await getLiveSessions();
+  const totalRecords = sessions.length;
+  const passedCount = sessions.filter(s => s.passed).length;
   const passRate = totalRecords > 0 ? Math.round((passedCount / totalRecords) * 100) : 0;
   const avgScore = totalRecords > 0
-    ? Math.round((sessionsStore.reduce((acc, s) => acc + s.percentage, 0) / totalRecords))
+    ? Math.round((sessions.reduce((acc, s) => acc + s.percentage, 0) / totalRecords))
     : 0;
 
-  const rowsHtml = sessionsStore.map((s, idx) => `
+  const rowsHtml = sessions.map((s, idx) => `
     <tr class="dataset-row" style="border-bottom: 1px solid #e2e8f0; background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
       <td style="padding: 12px 14px; font-family: monospace; font-size: 11px; color: #64748b;">${s.id}</td>
       <td style="padding: 12px 14px; font-size: 12px; color: #475569;">${new Date(s.timestamp).toLocaleString()}</td>
@@ -363,7 +295,7 @@ app.get('/dataset', async (_req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Web Dataset · NurseSafe Clinical Safety</title>
+  <title>Supabase Dataset · NurseSafe Clinical Safety</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f1f5f9; margin: 0; padding: 24px; color: #0f172a; }
@@ -399,9 +331,9 @@ app.get('/dataset', async (_req: Request, res: Response) => {
   <div class="container">
     <div class="header">
       <div>
-        <h1 style="margin: 0 0 4px 0; font-size: 22px; letter-spacing: -0.01em;">Live Web Dataset · Clinical Safety Lab</h1>
-        <p style="margin: 0; font-size: 13px; opacity: 0.9;">Real-time dataset synchronized dynamically from nurse trainee assessments</p>
-        <span style="display:inline-block; margin-top:6px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.2); padding:3px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.3);">🔒 READ-ONLY RESEARCH AUDIT LOG · MODIFICATIONS RESTRICTED</span>
+        <h1 style="margin: 0 0 4px 0; font-size: 22px; letter-spacing: -0.01em;">Supabase Clinical Dataset · NurseSafe</h1>
+        <p style="margin: 0; font-size: 13px; opacity: 0.9;">Persistent session records synchronized securely from Supabase</p>
+        <span style="display:inline-block; margin-top:6px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.2); padding:3px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.3);">🔒 SECURE DATABASE AUDIT LOG</span>
       </div>
       <div class="actions">
         <a href="/api/download/excel" class="btn btn-green">⬇ Download Excel (.xlsx)</a>
@@ -457,7 +389,7 @@ app.get('/dataset', async (_req: Request, res: Response) => {
         </thead>
         <tbody>
           ${totalRecords === 0
-            ? '<tr><td colspan="9" style="text-align: center; padding: 48px; color: #94a3b8; font-size: 14px;">No sessions recorded yet. Complete any module in the app to record data in real time.</td></tr>'
+            ? '<tr><td colspan="9" style="text-align: center; padding: 48px; color: #94a3b8; font-size: 14px;">No sessions recorded yet. Complete any module in the app to record data in Supabase.</td></tr>'
             : rowsHtml}
         </tbody>
       </table>
@@ -498,7 +430,6 @@ app.delete('/api/sessions', (_req: Request, res: Response) => {
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Serve static assets fallback
   app.use('/src/assets', express.static(path.resolve(__dirname, 'src/assets')));
 
   if (!isProduction) {
@@ -509,7 +440,6 @@ async function startServer() {
     });
     app.use(vite.middlewares);
 
-    // SPA fallback for development mode
     app.use('*', async (req, res, next) => {
       if (req.originalUrl.startsWith('/api')) {
         return next();
@@ -547,7 +477,7 @@ async function startServer() {
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
-        res.status(404).send('Frontend static bundle (dist/index.html) not found. Please ensure build completed successfully.');
+        res.status(404).send('Frontend static bundle (dist/index.html) not found.');
       }
     });
   }

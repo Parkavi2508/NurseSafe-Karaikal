@@ -4,8 +4,6 @@ import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, FileText, ChevronL
 import { sound } from '../utils/audio';
 import { shuffleArray } from '../data/questionBank';
 import confetti from 'canvas-confetti';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 interface QuizSimulatorProps {
   module: SafetyModule;
@@ -196,17 +194,7 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
       timestamp: new Date().toISOString()
     };
 
-    // Permanently persist to Google Cloud Firestore (immune to serverless scale-to-zero)
-    try {
-      const cleanSession = JSON.parse(JSON.stringify(localSession));
-      await setDoc(doc(db, 'clinical_sessions', localSession.id), {
-        ...cleanSession,
-        createdAt: localSession.timestamp
-      });
-    } catch (fireErr) {
-      console.warn('Firestore persistence notice:', fireErr);
-    }
-
+    // Send session to server API for durable persistence and Firestore storage
     try {
       const response = await fetch('/api/sessions', {
         method: 'POST',
@@ -230,13 +218,12 @@ export const QuizSimulator: React.FC<QuizSimulatorProps> = ({
         setRecordedSession(saved);
         onSessionCompleted(saved);
       } else {
-        setRecordedSession(localSession);
-        onSessionCompleted(localSession);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save session record to database.');
       }
-    } catch (err) {
-      console.warn('Backend unavailable, saving session locally:', err);
-      setRecordedSession(localSession);
-      onSessionCompleted(localSession);
+    } catch (err: any) {
+      console.error('Session persistence failed:', err);
+      alert('Error saving assessment record: ' + (err?.message || 'Database connection error. Please try again.'));
     } finally {
       setIsSaving(false);
     }
